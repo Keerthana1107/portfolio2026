@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Party Planner - PocketSmart AI{% endblock %}
+{% block content %}
+<h1>🎉 Party Budget Planner</h1>
+<form id="partyForm" class="planner-form">
+    <label>Total budget (₹)</label>
+    <input type="number" name="total_budget" min="0" step="0.01" required>
+
+    <div class="grid-2">
+        <div>
+            <label>Party type</label>
+            <select name="party_type">
+                <option value="Birthday">Birthday</option>
+                <option value="Wedding">Wedding</option>
+                <option value="Corporate">Corporate</option>
+                <option value="Anniversary">Anniversary</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+        <div><label>Number of guests</label><input type="number" name="num_guests" min="1" value="20" required></div>
+    </div>
+
+    <label>Venue type</label>
+    <input type="text" name="venue_type" placeholder="e.g. banquet hall, outdoor lawn">
+
+    <label>Needs</label>
+    <div class="checkbox-row">
+        <label><input type="checkbox" name="needs_catering" checked> Catering</label>
+        <label><input type="checkbox" name="needs_decoration" checked> Decoration</label>
+        <label><input type="checkbox" name="needs_entertainment"> Entertainment</label>
+    </div>
+
+    <label>Additional requirements</label>
+    <textarea name="additional_requirements" rows="3"></textarea>
+
+    <button type="submit" class="btn-primary">Get Recommendations</button>
+</form>
+
+<div id="loading" class="hidden">Generating recommendations…</div>
+<div id="results"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('partyForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const payload = {
+        total_budget: parseFloat(fd.get('total_budget')),
+        party_type: fd.get('party_type'),
+        num_guests: parseInt(fd.get('num_guests')),
+        venue_type: fd.get('venue_type') || null,
+        needs_catering: fd.get('needs_catering') === 'on',
+        needs_decoration: fd.get('needs_decoration') === 'on',
+        needs_entertainment: fd.get('needs_entertainment') === 'on',
+        additional_requirements: fd.get('additional_requirements') || null
+    };
+
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('results').innerHTML = '';
+
+    const res = await fetch('/party-budget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    document.getElementById('loading').classList.add('hidden');
+
+    if (!res.ok) {
+        const err = await res.json();
+        document.getElementById('results').innerHTML = `<p class="error">${err.detail || 'Something went wrong'}</p>`;
+        return;
+    }
+    const data = await res.json();
+    renderResults(data);
+});
+
+function renderResults(data) {
+    const container = document.getElementById('results');
+    let html = `<h2>Budget: ₹${data.total_budget} &nbsp;|&nbsp; Remaining: ₹${data.remaining_budget ?? '—'}</h2>`;
+    (data.budget_breakdown || []).forEach(cat => {
+        html += `<div class="category-block"><h3>${cat.category} — ₹${cat.allocation}</h3><div class="item-grid">`;
+        (cat.items || []).forEach(item => {
+            html += `<div class="item-card">
+                <h4>${item.name}</h4>
+                <p>${item.description || ''}</p>
+                <p class="price">₹${item.estimated_price} × ${item.quantity}</p>
+                <div class="links">${Object.entries(item.shopping_links || {}).map(([site, url]) =>
+                    `<a href="${url}" target="_blank">${site}</a>`).join(' ')}</div>
+            </div>`;
+        });
+        html += `</div></div>`;
+    });
+    if (data.venue_suggestions && data.venue_suggestions.length) {
+        html += `<div class="category-block"><h3>Venue suggestions</h3><div class="item-grid">`;
+        data.venue_suggestions.forEach(v => {
+            html += `<div class="item-card">
+                <h4>${v.name}</h4>
+                <p>${v.type || ''} · capacity ${v.capacity || '—'}</p>
+                <p class="price">₹${v.estimated_cost}</p>
+                <div class="links">${Object.entries(v.search_links || {}).map(([site, url]) =>
+                    `<a href="${url}" target="_blank">${site}</a>`).join(' ')}</div>
+            </div>`;
+        });
+        html += `</div></div>`;
+    }
+    container.innerHTML = html;
+}
+</script>
+{% endblock %}

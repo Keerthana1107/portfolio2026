@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}History - PocketSmart AI{% endblock %}
+{% block content %}
+<h1>🕘 Recommendation History</h1>
+<div id="historyList">Loading…</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(async () => {
+    const res = await fetch('/recommendation-history');
+    const container = document.getElementById('historyList');
+    if (!res.ok) { container.innerHTML = '<p class="error">Could not load history.</p>'; return; }
+    const { history } = await res.json();
+    if (!history.length) { container.innerHTML = '<p>No recommendations yet.</p>'; return; }
+
+    container.innerHTML = history.map(item => `
+        <div class="history-item" data-id="${item.id}">
+            <h3>${item.type.toUpperCase()} — ${new Date(item.timestamp).toLocaleString()}</h3>
+            <p>Budget: ₹${item.summary.total_budget ?? '—'} · Remaining: ₹${item.summary.remaining_budget ?? '—'}</p>
+            <button class="btn-link view-details">View details</button>
+            <pre class="details hidden"></pre>
+        </div>
+    `).join('');
+
+    container.querySelectorAll('.view-details').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const wrap = e.target.closest('.history-item');
+            const id = wrap.dataset.id;
+            const pre = wrap.querySelector('.details');
+            if (!pre.classList.contains('hidden')) { pre.classList.add('hidden'); return; }
+            const res = await fetch(`/recommendation-details/${id}`);
+            const data = await res.json();
+            pre.textContent = JSON.stringify(data.full_result, null, 2);
+            pre.classList.remove('hidden');
+        });
+    });
+})();
+</script>
+{% endblock %}

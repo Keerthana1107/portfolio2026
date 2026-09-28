@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Jewelry Planner - PocketSmart AI{% endblock %}
+{% block content %}
+<h1>💍 Jewelry Budget Planner</h1>
+<form id="jewelryForm" class="planner-form" enctype="multipart/form-data">
+    <label>Total budget (₹)</label>
+    <input type="number" name="total_budget" min="0" step="0.01" required>
+
+    <label>Occasion</label>
+    <input type="text" name="occasion" placeholder="e.g. wedding reception, festive wear" required>
+
+    <label>Style preferences</label>
+    <input type="text" name="preferences" placeholder="e.g. gold, traditional, minimal">
+
+    <label>Outfit photo (optional)</label>
+    <input type="file" name="image" accept="image/*">
+
+    <button type="submit" class="btn-primary">Get Recommendations</button>
+</form>
+
+<div id="loading" class="hidden">Generating recommendations…</div>
+<div id="results"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('jewelryForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);   // multipart, matches Form()/File() on the backend
+
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('results').innerHTML = '';
+
+    const res = await fetch('/jewelry-budget', { method: 'POST', body: fd });
+    document.getElementById('loading').classList.add('hidden');
+
+    if (!res.ok) {
+        const err = await res.json();
+        document.getElementById('results').innerHTML = `<p class="error">${err.detail || 'Something went wrong'}</p>`;
+        return;
+    }
+    const data = await res.json();
+    renderResults(data);
+});
+
+function renderResults(data) {
+    const container = document.getElementById('results');
+    let html = `<h2>Budget: ₹${data.total_budget} &nbsp;|&nbsp; Remaining: ₹${data.remaining_budget ?? '—'}</h2>`;
+    if (data.outfit_analysis) {
+        html += `<p><strong>Outfit read:</strong> ${data.outfit_analysis.style || ''}, ${(data.outfit_analysis.colors || []).join(', ')}, ${data.outfit_analysis.formality || ''}</p>`;
+    }
+    html += `<div class="item-grid">`;
+    (data.jewelry_recommendations || []).forEach(item => {
+        html += `<div class="item-card">
+            <h4>${item.item_type}</h4>
+            <p>${item.description || ''}</p>
+            <p class="price">₹${item.estimated_price}</p>
+            <div class="links">${Object.entries(item.shopping_links || {}).map(([site, url]) =>
+                `<a href="${url}" target="_blank">${site}</a>`).join(' ')}</div>
+        </div>`;
+    });
+    html += `</div>`;
+    container.innerHTML = html;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Register - PocketSmart AI{% endblock %}
+{% block content %}
+<div class="auth-card">
+    <h1>Create your account</h1>
+    <p class="subtitle">Join PocketSmart AI</p>
+    <form id="registerForm">
+        <label>Username</label>
+        <input type="text" name="username" required>
+        <label>Email</label>
+        <input type="email" name="email" required>
+        <label>Full name</label>
+        <input type="text" name="full_name">
+        <label>Password</label>
+        <input type="password" name="password" required>
+        <button type="submit" class="btn-primary">Register</button>
+    </form>
+    <p id="registerMsg"></p>
+    <p class="switch">Already have an account? <a href="/login">Log in</a></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    const res = await fetch('/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    const msg = document.getElementById('registerMsg');
+    const body = await res.json();
+    if (res.ok) {
+        msg.className = 'success';
+        msg.textContent = body.message + ' Redirecting to login...';
+        setTimeout(() => window.location.href = '/login', 1200);
+    } else {
+        msg.className = 'error';
+        msg.textContent = body.detail || 'Registration failed';
+    }
+});
+</script>
+{% endblock %}
